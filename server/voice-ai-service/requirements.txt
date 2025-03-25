@@ -1,0 +1,11 @@
+fastapi>=0.115.12
+uvicorn>=0.34.0
+aiohttp>=3.11.14
+python-dotenv>=1.0.1
+loguru>=0.7.3
+pydantic>=2.10.6
+pipecat-ai>=0.0.60
+pydantic-settings>=2.8.1
+anthropic>=0.49.0
+pipecat-ai[anthropic]
+

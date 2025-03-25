@@ -1,6 +1,9 @@
 # dependencies (bun install)
 node_modules
 
+# references
+ex
+
 # output
 out
 dist
@@ -14,6 +17,7 @@ coverage
 logs
 _.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+__pycache__
 
 # dotenv environment variable files
 .env

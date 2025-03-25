@@ -9,7 +9,7 @@
     "moduleResolution": "bundler",
     "module": "preserve",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    // "verbatimModuleSyntax": true,
     "noEmit": true,
 
     "baseUrl": ".",
