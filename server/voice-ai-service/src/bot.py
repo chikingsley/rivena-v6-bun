@@ -1,15 +1,10 @@
 """
-Comprehensive Voice Bot Implementation
+Simplified Voice Bot Implementation
 
-This bot combines multiple advanced features:
+This bot focuses on the core features:
 1. Interruptible conversations using Anthropic Claude
-2. Krisp noise filtering
-3. Wake/sleep phrases
-4. User idle detection
-5. Persistent conversation context
-6. Observer pattern for monitoring
-7. Function calling capabilities
-8. (RAG support commented out for future implementation)
+2. Persistent conversation context
+3. Observer pattern for monitoring
 """
 
 import asyncio
@@ -23,23 +18,22 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 
+# Import essential components only
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-# from pipecat.audio.filters.krisp_filter import KrispFilter
 from pipecat.frames.frames import EndFrame, LLMMessagesFrame, TTSSpeakFrame, Frame, StartInterruptionFrame, BotStartedSpeakingFrame, BotStoppedSpeakingFrame, UserStoppedSpeakingFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.user_idle_processor import UserIdleProcessor
-from pipecat.processors.filters.wake_check_filter import WakeCheckFilter
-# from pipecat.processors.filters.sleep_check_filter import SleepCheckFilter
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.anthropic import AnthropicLLMService
-from pipecat.services.elevenlabs import ElevenLabsTTSService
+from pipecat.services.elevenlabs import ElevenLabsTTSService  # Import ElevenLabs but will comment its usage
 from pipecat.transports.services.daily import DailyParams, DailyTransport, DailyTransportMessageFrame
 from pipecat.observers.base_observer import BaseObserver
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 
+# Import custom observers
 from utils.observers import VoiceBotObserver
 
 # Load environment variables
@@ -59,8 +53,6 @@ Key points:
 - If interrupted, resume your thought where you left off
 - If asked to expand on a topic, provide more detailed information
 - Speak naturally as this is a voice conversation
-
-When in sleep mode, you'll only respond to the wake phrase "Hey assistant" or similar variations.
 """
 
 # Ensure conversation storage directory exists
@@ -69,12 +61,12 @@ os.makedirs(CONVERSATION_STORAGE_PATH, exist_ok=True)
 
 class VoiceBotManager:
     """
-    Manager class for the voice bot that handles all features and integration.
+    Simplified manager class for the voice bot.
     """
 
     def __init__(self, room_url: str, token: str = None, session_id: str = None):
         """
-        Initialize the voice bot with all necessary components.
+        Initialize the voice bot with core components.
         
         Args:
             room_url: URL of the Daily room to join
@@ -88,16 +80,19 @@ class VoiceBotManager:
         self.runner: Optional[PipelineRunner] = None
         self.transport: Optional[DailyTransport] = None
         self.llm: Optional[AnthropicLLMService] = None
-        self.tts: Optional[ElevenLabsTTSService] = None
+        self.tts = None  # Will be set during initialization
         self.context: Optional[OpenAILLMContext] = None
-        self.wake_filter: Optional[WakeCheckFilter] = None
-        # self.sleep_filter: Optional[SleepCheckFilter] = None
         self.user_idle: Optional[UserIdleProcessor] = None
         self.observers: List[BaseObserver] = []
         self.metrics = {
             "interruptions": 0,
             "total_turns": 0,
             "last_activity": datetime.now().isoformat(),
+            "bot_speaking_time": 0,
+            "user_speaking_time": 0,
+            "total_tokens": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
         }
         self.status = "initializing"  # initializing, active, sleeping, idle
         self.function_registry = {}
@@ -109,7 +104,7 @@ class VoiceBotManager:
         """
         Initialize all components and connect to the Daily room.
         """
-        # 1. Set up Daily transport with Krisp filtering
+        # 1. Set up Daily transport with minimal config
         self.transport = DailyTransport(
             self.room_url,
             self.token,
@@ -120,16 +115,29 @@ class VoiceBotManager:
                 transcription_enabled=True,
                 vad_enabled=True,
                 vad_analyzer=SileroVADAnalyzer(),
-                vad_audio_passthrough=True,
-                # audio_in_filter=KrispFilter(),
             ),
         )
 
-        # 2. Initialize TTS service
+        # 2. Initialize ElevenLabs TTS service
         self.tts = ElevenLabsTTSService(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),  # Default voice
+            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"),  # Default voice
+            model=os.getenv("ELEVENLABS_MODEL", "eleven_turbo_v2"),
+            sample_rate=16000,
         )
+        
+        # Comment out the following code for Hume TTS that can be uncommented later
+        """
+        # Alternative: Hume TTS
+        from utils.hume import HumeTTSService
+        
+        self.tts = HumeTTSService(
+            api_key=os.getenv("HUME_API_KEY"),
+            voice_description="A warm, friendly professional voice with a conversational tone",
+            model="v1", 
+            sample_rate=16000,
+        )
+        """
 
         # 3. Initialize Anthropic LLM service
         self.llm = AnthropicLLMService(
@@ -141,32 +149,24 @@ class VoiceBotManager:
         self.context = OpenAILLMContext(self.messages)
         self.context_aggregator = self.llm.create_context_aggregator(self.context)
 
-        # 5. Initialize wake/sleep filters
-        self.wake_filter = WakeCheckFilter(
-            ["hey assistant", "hey there", "hello assistant", "hi assistant"]
-        )
-        # self.sleep_filter = SleepCheckFilter(
-        #     ["go to sleep", "sleep mode", "pause listening", "stop listening"]
-        # )
-
-        # 6. Set up user idle detection
+        # 5. Set up user idle detection
         self.user_idle = UserIdleProcessor(
             callback=self.handle_user_idle,
             timeout=float(os.getenv("USER_IDLE_TIMEOUT", "15.0")),
         )
 
-        # 7. Register basic functions
+        # 6. Register basic functions
         self._register_functions()
 
-        # 8. Set up event handlers
+        # 7. Set up event handlers
         self._setup_event_handlers()
 
-        # 9. Create observer
+        # 8. Create observer
         self.bot_observer = VoiceBotObserver(metrics=self.metrics)
         self.observers.append(self.bot_observer)
         self.observers.append(LLMLogObserver())
 
-        # 10. Create the pipeline
+        # 9. Create the pipeline
         self._create_pipeline()
 
         logger.info(f"Bot initialized for room: {self.room_url}")
@@ -252,20 +252,6 @@ class VoiceBotManager:
                 logger.info("Bot left the call")
                 await self.task.queue_frame(EndFrame())
 
-        # @self.sleep_filter.event_handler("on_sleep_command")
-        # async def on_sleep_command(filter, text):
-        #     logger.info(f"Sleep command detected: {text}")
-        #     self.status = "sleeping"
-        #     await self.tts.say("I'm going into sleep mode. Say 'Hey assistant' when you need me.")
-            
-        @self.wake_filter.event_handler("on_wake_command")
-        async def on_wake_command(filter, text):
-            logger.info(f"Wake command detected: {text}")
-            if self.status == "sleeping":
-                self.status = "active"
-                await self.tts.say("I'm awake and listening.")
-                await self.task.queue_frames([self.context_aggregator.user().get_context_frame()])
-
     def _create_pipeline(self):
         """Create the processing pipeline."""
         
@@ -274,8 +260,6 @@ class VoiceBotManager:
             [
                 self.transport.input(),  # Input from Daily
                 self.user_idle,          # Check for user idle
-                self.wake_filter,        # Check for wake phrase
-                # self.sleep_filter,       # Check for sleep phrase
                 self.context_aggregator.user(),  # User context
                 self.llm,               # LLM processing
                 self.tts,               # Text-to-speech
@@ -366,32 +350,6 @@ class VoiceBotManager:
             "metrics": self.metrics,
         }
 
-    async def wake(self) -> bool:
-        """
-        Wake the bot from sleep mode.
-        
-        Returns:
-            Success status
-        """
-        if self.status == "sleeping":
-            self.status = "active"
-            await self.tts.say("I'm awake and listening.")
-            return True
-        return False
-
-    async def sleep(self) -> bool:
-        """
-        Put the bot into sleep mode.
-        
-        Returns:
-            Success status
-        """
-        if self.status == "active":
-            self.status = "sleeping"
-            await self.tts.say("I'm going into sleep mode. Say 'Hey assistant' when you need me.")
-            return True
-        return False
-
     async def disconnect(self) -> bool:
         """
         Disconnect the bot from the room.
@@ -411,7 +369,7 @@ async def main():
     """
     import argparse
     
-    parser = argparse.ArgumentParser(description="Comprehensive Voice Bot")
+    parser = argparse.ArgumentParser(description="Simplified Voice Bot")
     parser.add_argument("-u", "--url", type=str, required=True, help="URL of the Daily room")
     parser.add_argument("-t", "--token", type=str, help="Token for the Daily room")
     parser.add_argument("-s", "--session", type=str, help="Session ID")
@@ -424,69 +382,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
-
-# RAG Support - Commented out for future implementation
-"""
-# Import necessary RAG components
-# from pipecat.processors.rag import RAGProcessor
-# from pipecat.services.vector_store import VectorStore
-
-class RAGVoiceBotManager(VoiceBotManager):
-    '''Extension of VoiceBotManager with RAG capabilities.'''
-    
-    async def initialize(self):
-        await super().initialize()
-        
-        # Initialize vector store
-        # self.vector_store = VectorStore(
-        #     connection_string=os.getenv("VECTOR_STORE_CONNECTION"),
-        #     embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")
-        # )
-        
-        # Create RAG processor
-        # self.rag_processor = RAGProcessor(
-        #     vector_store=self.vector_store,
-        #     max_results=int(os.getenv("RAG_MAX_RESULTS", "5")),
-        #     similarity_threshold=float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.7"))
-        # )
-        
-        # Add RAG to pipeline
-        # Update pipeline to include RAG
-        # self._create_pipeline_with_rag()
-        
-        return self
-        
-    def _create_pipeline_with_rag(self):
-        '''Create the processing pipeline with RAG integration.'''
-        
-        # Main pipeline with RAG
-        # pipeline = Pipeline(
-        #     [
-        #         self.transport.input(),  # Input from Daily
-        #         self.user_idle,          # Check for user idle
-        #         self.wake_filter,        # Check for wake phrase
-        #         self.sleep_filter,       # Check for sleep phrase
-        #         self.context_aggregator.user(),  # User context
-        #         self.rag_processor,      # RAG processing
-        #         self.llm,               # LLM processing
-        #         self.tts,               # Text-to-speech
-        #         self.transport.output(),  # Output to Daily
-        #         self.context_aggregator.assistant(),  # Assistant context
-        #     ]
-        # )
-        
-        # self.task = PipelineTask(
-        #     pipeline,
-        #     params=PipelineParams(
-        #         allow_interruptions=True,
-        #         enable_metrics=True,
-        #         enable_usage_metrics=True,
-        #         report_only_initial_ttfb=True,
-        #     ),
-        #     observers=self.observers,
-        # )
-        
-        # self.runner = PipelineRunner(handle_sigint=False)
-""" 
+    asyncio.run(main()) 

@@ -1,21 +1,6 @@
-# bun-react-template
+# Rivena Voice AI 
 
-To install dependencies:
-
-```bash
-bun install
-```
-
-To start a development server:
-
-```bash
-bun dev
-```
-
-To run for production:
-
-```bash
-bun start
-```
-
-This project was created using `bun init` in bun v1.2.5. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+TODO 
+[ ] check that existing ui works with voice input
+[ ] add rest fo mock ui 
+[ ] add hume tts

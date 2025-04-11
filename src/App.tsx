@@ -1,5 +1,4 @@
 import "./index.css";
-import { APITester } from "./APITester";
 import { VoiceChat } from "./components/VoiceChat";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -56,7 +55,6 @@ export function App() {
       <Tabs defaultValue="voice" className="w-full">
         <TabsList className="mx-auto flex justify-center mb-6">
           <TabsTrigger value="voice">Voice Assistant</TabsTrigger>
-          <TabsTrigger value="api">API Tester</TabsTrigger>
         </TabsList>
         <TabsContent value="voice">
           <VoiceChat 
@@ -65,9 +63,6 @@ export function App() {
             onSleepBot={handleSleepBot}
             onWakeBot={handleWakeBot}
           />
-        </TabsContent>
-        <TabsContent value="api">
-          <APITester />
         </TabsContent>
       </Tabs>
     </div>

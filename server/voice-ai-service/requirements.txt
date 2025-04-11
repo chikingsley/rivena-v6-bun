@@ -8,4 +8,10 @@ pipecat-ai>=0.0.60
 pydantic-settings>=2.8.1
 anthropic>=0.49.0
 pipecat-ai[anthropic]
+hume>=0.7.8
+websockets>=11.0.3
+pipecat-ai[elevenlabs]
+
+# Optional: Uncomment to use Hume TTS
+# hume>=0.7.8
 

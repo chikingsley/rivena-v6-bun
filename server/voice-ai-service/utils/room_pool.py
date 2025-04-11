@@ -175,10 +175,15 @@ class RoomPool:
         data = {
             "properties": {
                 "exp": int((time.time() + 86400) * 1000),  # 24 hours
-                "enable_screenshare": True,
-                "enable_chat": True,
-                "start_video_off": False,
+                "enable_screenshare": False,
+                "enable_chat": False,
+                "start_video_off": True,
                 "start_audio_off": False,
+                "enable_prejoin_ui": False, 
+                "enable_people_ui": False,
+                "enable_network_ui": False,
+                "enable_knocking": False,
+                "enable_recording": False,
             }
         }
         
@@ -222,8 +227,20 @@ class RoomPool:
         data = {
             "properties": {
                 "room_name": room_name,
+                "eject_at_token_exp": False,
+                "eject_after_elapsed": 0,
+                # "nbf": int(time.time() * 1000),
                 "exp": int((time.time() + 86400) * 1000),  # 24 hours
-                "is_owner": True
+                "is_owner": True,
+                # "user_name": "pipecat-user",
+                # "user_id": "pipecat-user",
+                "enable_screenshare": False,
+                "start_video_off": True,
+                "start_audio_off": False,
+                "enable_recording": False,
+                "enable_prejoin_ui": False, 
+                "start_cloud_recording": False,
+                # "permissions": {}
             }
         }
         
